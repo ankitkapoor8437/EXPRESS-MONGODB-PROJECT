@@ -4,7 +4,7 @@ const Contact = require('../models/contactModel')
 // Get Contact
 const getContact = asyncHandler(async (req, res) => {
     try {
-        const contact = await Contact.find();
+        const contact = await Contact.find({ user_id: req.userdata.id });
         res.status(200).json(contact);
     } catch (error) {
         res.status(500).json({ message: error.message })
@@ -35,7 +35,12 @@ const createContact = asyncHandler(async (req, res) => {
         res.status(400);
         throw new Error("All feilds are reuired");
     }
-    const contact = await Contact.create(req.body);
+    const contact = await Contact.create({
+        name,
+        email,
+        phone,
+        user_id: req.userdata.id,
+    });
     res.status(200).json(contact);
 })
 
@@ -48,7 +53,13 @@ const updateContact = asyncHandler(async (req, res) => {
         res.status(400);
         throw new Error("All feilds are reuired");
     }
+    
     const contact = await Contact.findByIdAndUpdate(id, req.body);
+    if (contact.user_id.toString() !== req.userdata.id) {
+        res.status(403);
+        throw new Error("User don't have permission to Update other user Contacts")
+    }
+
     const updatedContact = await Contact.findById(id);
     res.status(200).json(updatedContact);
     res.status(200).json({ message: `Update contact ${id}.` })
@@ -59,11 +70,15 @@ const updateContact = asyncHandler(async (req, res) => {
 const deleteContact = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
-        const contact = await Contact.findByIdAndDelete(id);
+        const contact = await Contact.findById(id);
         if (!contact) {
             return res.status(404).json({ message: `Cannot find any product with ID ${id}` })
         }
-        // const deletedContact = await Contact.findById(id);
+        if (contact.user_id.toString() !== req.userdata.id) {
+            res.status(403);
+            throw new Error("User don't have permission to Update other user Contacts")
+        }
+        await contact.deleteOne({id})
         res.status(200).json({ message: `Deleted successfully`, contact })
         res.status(200).json(contact);
         res.status(200).json({ message: `Delete Contact ${id}.` })
